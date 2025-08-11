@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  pr-agent:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-agentic-workflow
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+      - ~/.ssh:/home/appuser/.ssh:ro  # For Git operations
+    networks:
+      - pr-agent-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["python", "run_agent.py", "--help"]
+
+  # Optional: Add a simple web interface for API access
+  pr-agent-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: pr-agentic-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./workspace:/app/workspace
+      - ./logs:/app/logs
+    networks:
+      - pr-agent-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+networks:
+  pr-agent-network:
+    driver: bridge
+
+volumes:
+  workspace:
+  logs:
