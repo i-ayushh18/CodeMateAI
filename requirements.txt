@@ -1,0 +1,29 @@
+# Core dependencies
+crewai>=0.28.0
+python-dotenv>=1.0.0
+
+# GitHub integration is already included in the requirements
+
+# GitHub integration
+pygithub>=1.59.0
+
+# Slack integration
+slack-sdk>=3.21.0
+
+# Email integration
+python-decouple>=3.8
+
+# LLM integration for code review
+openai>=1.1.0
+requests>=2.31.0
+tenacity>=8.2.0  # For advanced retry logic
+
+# API server dependencies
+fastapi>=0.100.0
+uvicorn>=0.22.0
+python-multipart>=0.0.6
+httpx>=0.24.0  # For TestClient in FastAPI tests
+
+# Utility libraries
+pydantic>=2.0.0
+requests>=2.31.0
