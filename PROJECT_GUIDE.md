@@ -346,6 +346,7 @@ python run_agent.py --verbose --issue 123 --developer
 - 🔔 **Smart Notifications**: Email alerts for important events
 - 🌐 **Multi-Repo Support**: Work across different repositories
 - 🐳 **Container Ready**: Full Docker support for deployment
+- 🤖 **CrewAI Integration**: Compatible with CrewAI for advanced multi-agent orchestration and complex workflows
 
 ## 🔒 Security Considerations
 

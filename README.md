@@ -83,6 +83,7 @@ docker exec pr-agentic-workflow python run_agent.py --help
 - **Auto PR Creation**: Create branches and PRs automatically
 - **Code Quality**: Security, performance, and style checks
 - **Notifications**: Email alerts for important events
+- **CrewAI Integration**: Compatible with CrewAI for advanced multi-agent orchestration
 
 ## 🤝 **Contributing**
 
