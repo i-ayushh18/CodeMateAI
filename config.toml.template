@@ -1,0 +1,64 @@
+# GitHub API Configuration
+[github]
+# GitHub API token (set via environment variable GITHUB_TOKEN or add here)
+token = ""
+# Repository details - Update with your repository
+repo_owner = "your-username"
+repo_name = "your-repo"
+# PR processing settings
+pr_fetch_limit = 3  # Reduced for demo purposes
+# Set to true to process draft PRs
+include_drafts = false
+
+[perplexity]
+# Perplexity API key (set via environment variable PERPLEXITY_API_KEY or add here)
+api_key = ""
+model = "sonar-pro"
+
+# Notification Settings
+[notifications]
+# Enable/disable notifications
+enabled = true
+# Email addresses to send notifications to
+email_to = ["your-email@example.com"]
+
+# Email provider: 'smtp' or 'curl'
+email_provider = "curl"
+
+# For curl-based email sending (when email_provider = "curl")
+curl_command = "curl -X POST https://your-notification-service.com/api/send-email -H Content-Type: application/json -d {\"email\":\"your-email@example.com\",\"subject\":\"{{subject}}\",\"email_body\":\"{{message}}\"}"
+
+# Logging Configuration
+[logging]
+# Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+level = "INFO"
+# Log file path
+file = "pr_workflow.log"
+
+# Developer Agent Settings
+[agent]
+# Path to store agent's working files
+workspace_dir = "./workspace"
+# Maximum number of retries for failed operations
+max_retries = 3
+# Timeout in seconds for agent operations
+timeout_seconds = 300
+# Whether to automatically commit changes
+auto_commit = false  # Disabled for demo
+# Branch to create PRs against
+target_branch = "main"
+
+# Code Review Settings
+[code_review]
+# Whether to enable code review
+enabled = true
+# Rules for code review (can be extended)
+rules = [
+    "check_code_style",
+    "check_security",
+    "check_performance"
+]
+# File patterns to include in review
+include_patterns = ["**/*.ts", "**/*.js", "**/*.json"]
+# File patterns to exclude from review
+exclude_patterns = ["**/node_modules/**", "**/*.d.ts"]
