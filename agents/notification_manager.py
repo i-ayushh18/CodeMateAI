@@ -79,11 +79,12 @@ class NotificationManager:
         Returns:
             bool: True if notification was sent successfully, False otherwise
         """
-        # For now, we'll use the email_to from config
-        # In a real implementation, you might want to get this from config
+        # Use email_to from config if no specific emails provided
         if to_emails is None:
-            # This would need to be passed from the config
-            to_emails = ["vermaayushbly@gmail.com"]  # Default for testing
+            to_emails = getattr(self.config, 'email_to', [])
+            if not to_emails:
+                logger.warning("No email recipients configured")
+                return False
         
         subject = f"PR Agent Notification - {level.upper()}"
         
@@ -108,7 +109,7 @@ Sent by PR Agentic Workflow
             
             # Construct the JSON payload
             payload = {
-                "email": to_emails[0] if to_emails else "vermaayushbly@gmail.com",
+                "email": to_emails[0] if to_emails else "",
                 "subject": subject,
                 "email_body": message
             }
@@ -122,7 +123,7 @@ Sent by PR Agentic Workflow
                 cmd = [
                     "curl",
                     "-X", "POST",
-                    "https://bytelyst-notification-fastapi-522468355655.europe-west1.run.app/api/send-email",
+                    "https://your-notification-service.com/api/send-email",
                     "-H", "Content-Type: application/json",
                     "-d", json_payload
                 ]
@@ -131,7 +132,7 @@ Sent by PR Agentic Workflow
                 cmd = [
                     "curl",
                     "-X", "POST",
-                    "https://bytelyst-notification-fastapi-522468355655.europe-west1.run.app/api/send-email",
+                    "https://your-notification-service.com/api/send-email",
                     "-H", "Content-Type: application/json",
                     "-d", json_payload
                 ]
@@ -157,8 +158,17 @@ Sent by PR Agentic Workflow
     
     async def _send_via_smtp(self, to_emails: List[str], subject: str, message: str) -> bool:
         """Send email using SMTP."""
-        if not all([self.config.smtp_server, self.config.email_from]):
-            logger.error("SMTP configuration is incomplete")
+        # Check required SMTP configuration
+        required_fields = ['smtp_server', 'smtp_port', 'email_from']
+        missing_fields = [field for field in required_fields if not getattr(self.config, field, None)]
+        
+        if missing_fields:
+            logger.error(f"SMTP configuration is incomplete. Missing: {', '.join(missing_fields)}")
+            return False
+            
+        # Check authentication if username/password are provided
+        if self.config.smtp_username and not self.config.smtp_password:
+            logger.error("SMTP username provided but password is missing")
             return False
             
         try:
@@ -170,15 +180,31 @@ Sent by PR Agentic Workflow
             msg.attach(MIMEText(message, 'plain'))
             
             # Connect to server and send email
+            logger.info(f"Connecting to SMTP server: {self.config.smtp_server}:{self.config.smtp_port}")
             with smtplib.SMTP(self.config.smtp_server, self.config.smtp_port) as server:
+                # Enable TLS for Gmail
+                server.starttls()
+                
+                # Authenticate if credentials are provided
                 if self.config.smtp_username and self.config.smtp_password:
-                    server.starttls()
+                    logger.info(f"Authenticating with username: {self.config.smtp_username}")
                     server.login(self.config.smtp_username, self.config.smtp_password)
+                else:
+                    logger.warning("No SMTP credentials provided - attempting unauthenticated connection")
+                
+                # Send the email
                 server.send_message(msg)
                 
             logger.info(f"Email sent successfully to {', '.join(to_emails)}")
             return True
             
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP authentication failed: {str(e)}")
+            logger.error("For Gmail, make sure you're using an App Password, not your regular password")
+            return False
+        except smtplib.SMTPException as e:
+            logger.error(f"SMTP error: {str(e)}")
+            return False
         except Exception as e:
-            logger.error(f"Error sending email via SMTP: {str(e)}")
+            logger.error(f"Unexpected error sending email via SMTP: {str(e)}")
             return False
