@@ -23,10 +23,17 @@ enabled = true
 email_to = ["your-email@example.com"]
 
 # Email provider: 'smtp' or 'curl'
-email_provider = "curl"
+email_provider = "smtp"
 
 # For curl-based email sending (when email_provider = "curl")
-curl_command = "curl -X POST https://your-notification-service.com/api/send-email -H Content-Type: application/json -d {\"email\":\"your-email@example.com\",\"subject\":\"{{subject}}\",\"email_body\":\"{{message}}\"}"
+# curl_command = "curl -X POST https://your-notification-service.com/api/send-email -H Content-Type: application/json -d {\"email\":\"your-email@example.com\",\"subject\":\"{{subject}}\",\"email_body\":\"{{message}}\"}"
+
+# For Gmail SMTP (when email_provider = "smtp")
+smtp_server = "smtp.gmail.com"
+smtp_port = 587
+smtp_username = "your-gmail@gmail.com"
+smtp_password = "your-app-password"  # Use Gmail App Password, not your regular password
+email_from = "your-gmail@gmail.com"
 
 # Logging Configuration
 [logging]
