@@ -303,7 +303,7 @@ class DeveloperAgent:
             
             # Get PR diff and files
             diff = self.github.get_pr_diff(pr_number)
-            files = self.github.get_pr_files(pr_number)
+            files = self.github.get_pr_files(pr_number, include_content=True)
             
             if not diff or not files:
                 return {
