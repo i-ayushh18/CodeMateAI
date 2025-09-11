@@ -68,7 +68,7 @@ class PRProcessor:
         # Mock the dependencies if not provided
         if notification_manager is None:
             from unittest.mock import MagicMock
-            notification_manager = MagicMock()
+            notification_manager=MagicMock
         
         # Initialize the developer agent with all required dependencies
         self.developer_agent = DeveloperAgent(
@@ -136,7 +136,7 @@ class PRProcessor:
             # 1. Get PR diff and files
             try:
                 diff = self.github_integration.get_pr_diff(pr_number)
-                files = self.github_integration.get_pr_files(pr_number)
+                files = self.github_integration.get_pr_files(pr_number, include_content=True)
                 
                 if not diff and not files:
                     error_msg = "Could not retrieve PR diff or files - empty response"
@@ -193,14 +193,12 @@ class PRProcessor:
                 # Get the actual file content for review
                 code_content = ""
                 if files and len(files) > 0:
-                    # Get content from the first file
-                    first_filename = files[0].get('filename', '')
-                    if first_filename:
-                        code_content = self.github_integration.get_pr_file_content(pr_number, first_filename)
-                        if not code_content:
-                            logger.warning(f"Could not get content for file {first_filename}, using diff")
-                            code_content = diff
+                    # Get content from the first file (now included in files data)
+                    first_file = files[0]
+                    if first_file.get('content'):
+                        code_content = first_file['content']
                     else:
+                        logger.warning(f"No content available for file {first_file.get('filename', '')}, using diff")
                         code_content = diff
                 else:
                     code_content = diff
@@ -553,7 +551,7 @@ The improvements have been applied in a separate PR to maintain a clean history.
             # 1. Get PR diff and files
             try:
                 diff = self.github_integration.get_pr_diff(pr_number)
-                files = self.github_integration.get_pr_files(pr_number)
+                files = self.github_integration.get_pr_files(pr_number, include_content=True)
                 
                 if not diff and not files:
                     error_msg = "Could not retrieve PR diff or files - empty response"
@@ -610,14 +608,12 @@ The improvements have been applied in a separate PR to maintain a clean history.
                 # Get the actual file content for review
                 code_content = ""
                 if files and len(files) > 0:
-                    # Get content from the first file
-                    first_filename = files[0].get('filename', '')
-                    if first_filename:
-                        code_content = self.github_integration.get_pr_file_content(pr_number, first_filename)
-                        if not code_content:
-                            logger.warning(f"Could not get content for file {first_filename}, using diff")
-                            code_content = diff
+                    # Get content from the first file (now included in files data)
+                    first_file = files[0]
+                    if first_file.get('content'):
+                        code_content = first_file['content']
                     else:
+                        logger.warning(f"No content available for file {first_file.get('filename', '')}, using diff")
                         code_content = diff
                 else:
                     code_content = diff
