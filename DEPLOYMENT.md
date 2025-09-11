@@ -193,7 +193,6 @@ api_key = "your-perplexity-key"
 
 [notification]
 email_enabled = true
-slack_enabled = false
 ```
 
 ## 📊 Monitoring and Logging
