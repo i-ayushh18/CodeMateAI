@@ -7,8 +7,8 @@ python-dotenv>=1.0.0
 # GitHub integration
 pygithub>=1.59.0
 
-# Slack integration
-slack-sdk>=3.21.0
+
+# Slack integration removed - not yet integrated
 
 # Email integration
 python-decouple>=3.8
