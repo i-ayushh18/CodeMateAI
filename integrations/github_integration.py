@@ -227,15 +227,17 @@ class GitHubIntegration:
             logger.error(f"Error getting file content for {filename} in PR #{pr_number}: {str(e)}")
             return ""
 
-    def get_pr_files(self, pr_number: int) -> List[Dict[str, Any]]:
+    def get_pr_files(self, pr_number: int, include_content: bool = False) -> List[Dict[str, Any]]:
         """Get the list of files changed in a pull request.
         
         Args:
             pr_number: PR number
+            include_content: Whether to include actual file content (default: False)
             
         Returns:
-            List[Dict]: List of file change information
+            List[Dict]: List of file change information with optional content
         """
+        logger.info(f"Getting files for PR #{pr_number} (include_content={include_content})")
         try:
             pr = self.get_pull_request(pr_number)
             if not pr:
@@ -255,19 +257,38 @@ class GitHubIntegration:
                         'changes': f.changes,
                         'patch': f.patch if hasattr(f, 'patch') else ''
                     }
+                    
+                    # Add file content if requested
+                    if include_content:
+                        try:
+                            repo = self.get_repository()
+                            head_ref = pr.head.ref if hasattr(pr, 'head') and hasattr(pr.head, 'ref') else 'main'
+                            content = repo.get_contents(f.filename, ref=head_ref).decoded_content.decode('utf-8')
+                            file_info['content'] = content
+                        except Exception as content_err:
+                            logger.warning(f"Could not get content for file {f.filename}: {str(content_err)}")
+                            file_info['content'] = f"Could not retrieve content: {str(content_err)}"
+                    
                     result.append(file_info)
+                    
                 except Exception as file_err:
                     logger.warning(f"Could not get full info for file {f.filename}: {str(file_err)}")
                     # Add basic file info even if we can't get all details
-                    result.append({
+                    fallback_info = {
                         'filename': f.filename,
                         'status': 'unknown',
                         'additions': 0,
                         'deletions': 0,
                         'changes': 0,
                         'patch': ''
-                    })
+                    }
+                    
+                    if include_content:
+                        fallback_info['content'] = f"Could not retrieve content: {str(file_err)}"
+                    
+                    result.append(fallback_info)
             
+            logger.info(f"Successfully retrieved {len(result)} files for PR #{pr_number}")
             return result
             
         except Exception as e:
@@ -370,42 +391,6 @@ class GitHubIntegration:
             logger.error(f"Error submitting review: {str(e)}")
             return False
 
-    def get_pr_files(self, pr_number: int) -> List[Dict[str, Any]]:
-        logger.info(f"Getting files for PR: {pr_number}")
-        try:
-            pr = self.get_pull_request(pr_number)
-            if not pr:
-                logger.error(f"Pull request {pr_number} not found")
-                return []
-            head_ref = pr.head.ref if hasattr(pr, 'head') and hasattr(pr.head, 'ref') else 'main'
-            files = pr.get_files()
-            files_with_content = []
-            for file in files:
-                try:
-                    repo = self.get_repository()
-                    content = repo.get_contents(file.filename, ref=head_ref).decoded_content.decode('utf-8')
-                    files_with_content.append({
-                        'filename': file.filename,
-                        'status': file.status,
-                        'additions': file.additions,
-                        'deletions': file.deletions,
-                        'changes': file.changes,
-                        'content': content
-                    })
-                except Exception as e:
-                    logger.warning(f"Could not get content for file {file.filename}: {str(e)}")
-                    files_with_content.append({
-                        'filename': file.filename,
-                        'status': file.status,
-                        'additions': file.additions,
-                        'deletions': file.deletions,
-                        'changes': file.changes,
-                        'content': f"Could not retrieve content: {str(e)}"
-                    })
-            return files_with_content
-        except Exception as e:
-            logger.error(f"Error getting PR files: {str(e)}")
-            return []
 
     def post_review_comments(self, pr_number: int, review_feedback: Dict[str, Any]) -> Dict[str, Any]:
         logger.info(f"Posting review comments to PR: {pr_number}")
