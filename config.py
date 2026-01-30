@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Configuration Management
 
@@ -9,11 +8,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Dict, Any, List, Optional
 
-# Try to import tomli (for Python < 3.11)
 try:
     import tomli as toml
 except ImportError:
-    # For Python 3.11+
     import tomllib as toml
 
 logger = logging.getLogger(__name__)
@@ -26,17 +23,6 @@ class GitHubConfig:
     repo_name: str = ""
     pr_fetch_limit: int = 10
     include_drafts: bool = False
-
-@dataclass
-class LLMConfig:
-    """LLM configuration."""
-    provider: str = "gemini"
-    api_key: str = ""
-    model: str = "gemini-pro"
-    temperature: float = 0.7
-    max_tokens: int = 2000
-
-
 
 @dataclass
 class PerplexityConfig:
@@ -74,24 +60,16 @@ class AgentConfig:
     auto_commit: bool = False
     target_branch: str = "main"
 
+# Simplified CodeReviewConfig - removed unused fields
 @dataclass
 class CodeReviewConfig:
     """Code review configuration."""
     enabled: bool = True
-    rules: List[str] = field(default_factory=lambda: [
-        "check_code_style",
-        "check_security",
-        "check_performance"
-    ])
-    include_patterns: List[str] = field(default_factory=lambda: ["**/*.py", "**/*.js", "**/*.ts"])
-    exclude_patterns: List[str] = field(default_factory=lambda: ["**/node_modules/**", "**/*.d.ts"])
 
 @dataclass
 class Config:
     """Main configuration class."""
     github: GitHubConfig = field(default_factory=GitHubConfig)
-    llm: LLMConfig = field(default_factory=LLMConfig)
-
     perplexity: PerplexityConfig = field(default_factory=PerplexityConfig)
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
@@ -129,21 +107,9 @@ def load_config(config_path: str = "config.toml") -> Config:
                 include_drafts=github_data.get('include_drafts', False)
             )
         
-        # LLM config
-        if 'llm' in config_data:
-            llm_data = config_data['llm']
-            config.llm = LLMConfig(
-                provider=llm_data.get('provider', 'gemini'),
-                api_key=llm_data.get('api_key', ''),
-                model=llm_data.get('model', 'gemini-pro'),
-                temperature=float(llm_data.get('temperature', 0.7)),
-                max_tokens=int(llm_data.get('max_tokens', 2000))
-            )
-        
         # Perplexity config
         if 'perplexity' in config_data:
             perplexity_data = config_data['perplexity']
-            # Check for environment variable first, then config file
             perplexity_api_key = os.getenv('PERPLEXITY_API_KEY', perplexity_data.get('api_key', ''))
             config.perplexity = PerplexityConfig(
                 api_key=perplexity_api_key,
@@ -190,14 +156,7 @@ def load_config(config_path: str = "config.toml") -> Config:
         if 'code_review' in config_data:
             cr_data = config_data['code_review']
             config.code_review = CodeReviewConfig(
-                enabled=cr_data.get('enabled', True),
-                rules=cr_data.get('rules', [
-                    "check_code_style",
-                    "check_security",
-                    "check_performance"
-                ]),
-                include_patterns=cr_data.get('include_patterns', ["**/*.py", "**/*.js", "**/*.ts"]),
-                exclude_patterns=cr_data.get('exclude_patterns', ["**/node_modules/**", "**/*.d.ts"])
+                enabled=cr_data.get('enabled', True)
             )
         
         return config
