@@ -1,7 +1,6 @@
 import logging
 from typing import Dict, List, Any, Optional
 from github import Github, Repository, PullRequest
-from dataclasses import asdict
 from config import GitHubConfig
 
 logger = logging.getLogger(__name__)
@@ -295,7 +294,7 @@ class GitHubIntegration:
             logger.error(f"Error getting files for PR #{pr_number}: {str(e)}", exc_info=True)
             return []
 
-    async def create_branch(self, repo: str, branch: str, base_branch: str) -> bool:
+    def create_branch(self, repo: str, branch: str, base_branch: str) -> bool:
         """Create a new branch from an existing one.
         
         Args:
@@ -317,7 +316,7 @@ class GitHubIntegration:
             logger.error(f"Error creating branch {branch}: {str(e)}")
             return False
 
-    async def create_pull_request(self, repo: str, title: str, body: str, head: str, base: str) -> Optional[str]:
+    def create_pull_request(self, repo: str, title: str, body: str, head: str, base: str) -> Optional[str]:
         """Create a new pull request.
         
         Args:
@@ -370,27 +369,6 @@ class GitHubIntegration:
         except Exception as e:
             logger.error(f"Error getting pull requests: {str(e)}")
             return []
-
-    def add_review_comment(self, pr: PullRequest.PullRequest, body: str, commit_id: str, path: str, position: int) -> bool:
-        pr_number = getattr(pr, 'number', getattr(pr, 'id', 'Unknown'))
-        logger.info(f"Adding review comment to PR: {pr_number}")
-        try:
-            pr.create_review_comment(body=body, commit_id=commit_id, path=path, position=position)
-            return True
-        except Exception as e:
-            logger.error(f"Error adding review comment: {str(e)}")
-            return False
-
-    def submit_review(self, pr: PullRequest.PullRequest, body: str, event: str = "COMMENT") -> bool:
-        pr_number = getattr(pr, 'number', getattr(pr, 'id', 'Unknown'))
-        logger.info(f"Submitting review for PR: {pr_number}")
-        try:
-            pr.create_review(body=body, event=event)
-            return True
-        except Exception as e:
-            logger.error(f"Error submitting review: {str(e)}")
-            return False
-
 
     def post_review_comments(self, pr_number: int, review_feedback: Dict[str, Any]) -> Dict[str, Any]:
         logger.info(f"Posting review comments to PR: {pr_number}")
@@ -445,7 +423,49 @@ class GitHubIntegration:
             logger.error(f"Error posting review comments: {str(e)}")
             return {"status": "error", "message": str(e)}
 
-    async def update_file(
+    def submit_review(self, pr: PullRequest.PullRequest, body: str, event: str = "COMMENT") -> bool:
+        """Submit a review for a pull request.
+        
+        Args:
+            pr: Pull request object
+            body: Review body text
+            event: Review event type (COMMENT, APPROVE, REQUEST_CHANGES)
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Submit the review
+            pr.create_review(body=body, event=event)
+            logger.info(f"Submitted {event} review for PR #{pr.number}")
+            return True
+        except Exception as e:
+            logger.error(f"Error submitting review for PR #{pr.number}: {str(e)}")
+            return False
+
+    def add_review_comment(self, pr: PullRequest.PullRequest, body: str, commit_id: str, path: str, position: int) -> bool:
+        """Add a review comment to a specific line in a pull request.
+        
+        Args:
+            pr: Pull request object
+            body: Comment body text
+            commit_id: Commit SHA
+            path: File path
+            position: Line position
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Add the review comment
+            pr.create_review_comment(body=body, commit_id=commit_id, path=path, position=position)
+            logger.info(f"Added review comment to PR #{pr.number} on {path}:{position}")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding review comment to PR #{pr.number}: {str(e)}")
+            return False
+
+    def update_file(
         self, 
         repo: str, 
         path: str, 
@@ -466,45 +486,45 @@ class GitHubIntegration:
             bool: True if successful, False otherwise
         """
         try:
-            repo = self.github.get_repo(repo)
+            github_repo = self.github.get_repo(repo)
             
             # If branch is not provided, use the default branch
             if not branch:
-                branch = repo.default_branch
+                branch = github_repo.default_branch
             
             # Try to get the file to update
             try:
-                file = repo.get_contents(path, ref=branch)
+                file = github_repo.get_contents(path, ref=branch)
                 # File exists, update it
-                repo.update_file(
+                github_repo.update_file(
                     path=path,
                     message=message,
                     content=content,
                     sha=file.sha,
                     branch=branch
                 )
-                logger.info(f"Updated file {path} in {repo.full_name} on branch {branch}")
+                logger.info(f"Updated file {path} in {github_repo.full_name} on branch {branch}")
                 return True
                 
             except Exception as e:
                 if "Not Found" in str(e):
                     # File doesn't exist, create it
-                    repo.create_file(
+                    github_repo.create_file(
                         path=path,
                         message=message,
                         content=content,
                         branch=branch
                     )
-                    logger.info(f"Created new file {path} in {repo.full_name} on branch {branch}")
+                    logger.info(f"Created new file {path} in {github_repo.full_name} on branch {branch}")
                     return True
                 else:
                     raise
                     
         except Exception as e:
-            logger.error(f"Error updating file {path} in {repo.full_name}: {str(e)}")
+            logger.error(f"Error updating file {path} in {repo}: {str(e)}")
             return False
 
-    async def merge_pull_request(
+    def merge_pull_request(
         self, 
         pr_number: int, 
         merge_method: str = "merge", 
