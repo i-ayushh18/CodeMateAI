@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Notification Manager
 
@@ -31,11 +30,9 @@ class NotificationManager:
     
     def __init__(self, config):
         """Initialize with configuration."""
-        # If config is already a NotificationConfig object, use it directly
         if isinstance(config, NotificationConfig):
             self.config = config
         else:
-            # For backward compatibility with dictionary configs
             self.config = NotificationConfig(
                 email_provider=getattr(config, 'email_provider', 'smtp'),
                 curl_command=getattr(config, 'curl_command', None),
@@ -47,17 +44,6 @@ class NotificationManager:
             )
     
     async def send_email(self, to_emails: List[str], subject: str, message: str) -> bool:
-        """
-        Send an email using the configured provider.
-        
-        Args:
-            to_emails: List of recipient email addresses
-            subject: Email subject
-            message: Email body
-            
-        Returns:
-            bool: True if email was sent successfully, False otherwise
-        """
         if not to_emails:
             logger.warning("No recipients specified for email")
             return False
@@ -68,18 +54,6 @@ class NotificationManager:
             return await self._send_via_smtp(to_emails, subject, message)
     
     async def send_notification(self, message: str, level: str = 'info', to_emails: Optional[List[str]] = None) -> bool:
-        """
-        Send a notification message.
-        
-        Args:
-            message: The notification message
-            level: Notification level ('info', 'warning', 'error')
-            to_emails: Optional list of email addresses to send to (uses config default if None)
-            
-        Returns:
-            bool: True if notification was sent successfully, False otherwise
-        """
-        # Use email_to from config if no specific emails provided
         if to_emails is None:
             to_emails = getattr(self.config, 'email_to', [])
             if not to_emails:
@@ -88,7 +62,6 @@ class NotificationManager:
         
         subject = f"PR Agent Notification - {level.upper()}"
         
-        # Format the message with level
         formatted_message = f"""
 PR Agent Notification
 
@@ -102,24 +75,19 @@ Sent by PR Agentic Workflow
         return await self.send_email(to_emails, subject, formatted_message)
     
     async def _send_via_curl(self, to_emails: List[str], subject: str, message: str) -> bool:
-        """Send email using curl command."""
         try:
             import json
             import platform
             
-            # Construct the JSON payload
             payload = {
                 "email": to_emails[0] if to_emails else "",
                 "subject": subject,
                 "email_body": message
             }
             
-            # Convert to JSON string
             json_payload = json.dumps(payload)
             
-            # Construct the curl command based on the platform
             if platform.system() == "Windows":
-                # Windows-friendly curl command
                 cmd = [
                     "curl",
                     "-X", "POST",
@@ -128,7 +96,6 @@ Sent by PR Agentic Workflow
                     "-d", json_payload
                 ]
             else:
-                # Unix-friendly curl command
                 cmd = [
                     "curl",
                     "-X", "POST",
@@ -137,7 +104,6 @@ Sent by PR Agentic Workflow
                     "-d", json_payload
                 ]
             
-            # Execute the curl command
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -157,8 +123,6 @@ Sent by PR Agentic Workflow
             return False
     
     async def _send_via_smtp(self, to_emails: List[str], subject: str, message: str) -> bool:
-        """Send email using SMTP."""
-        # Check required SMTP configuration
         required_fields = ['smtp_server', 'smtp_port', 'email_from']
         missing_fields = [field for field in required_fields if not getattr(self.config, field, None)]
         
@@ -166,33 +130,27 @@ Sent by PR Agentic Workflow
             logger.error(f"SMTP configuration is incomplete. Missing: {', '.join(missing_fields)}")
             return False
             
-        # Check authentication if username/password are provided
         if self.config.smtp_username and not self.config.smtp_password:
             logger.error("SMTP username provided but password is missing")
             return False
             
         try:
-            # Create message
             msg = MIMEMultipart()
             msg['From'] = self.config.email_from
             msg['To'] = ', '.join(to_emails)
             msg['Subject'] = subject
             msg.attach(MIMEText(message, 'plain'))
             
-            # Connect to server and send email
             logger.info(f"Connecting to SMTP server: {self.config.smtp_server}:{self.config.smtp_port}")
             with smtplib.SMTP(self.config.smtp_server, self.config.smtp_port) as server:
-                # Enable TLS for Gmail
                 server.starttls()
-                
-                # Authenticate if credentials are provided
+
                 if self.config.smtp_username and self.config.smtp_password:
                     logger.info(f"Authenticating with username: {self.config.smtp_username}")
                     server.login(self.config.smtp_username, self.config.smtp_password)
                 else:
                     logger.warning("No SMTP credentials provided - attempting unauthenticated connection")
                 
-                # Send the email
                 server.send_message(msg)
                 
             logger.info(f"Email sent successfully to {', '.join(to_emails)}")
