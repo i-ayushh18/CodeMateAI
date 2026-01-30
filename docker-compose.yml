@@ -1,4 +1,4 @@
-version: '3.8'
+kkversion: '3.8'
 
 services:
   pr-agent:
@@ -26,7 +26,6 @@ services:
       retries: 3
     command: ["python", "run_agent.py", "--help"]
 
-  # Optional: Add a simple web interface for API access
   pr-agent-api:
     build: 
       context: .

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 PR Agentic Workflow - Single Command Interface
 
@@ -186,7 +185,7 @@ if __name__ == "__main__":
     
     logger.info(f"Creating test branch: {test_branch}")
     
-    branch_created = await github.create_branch(
+    branch_created = github.create_branch(
         repo=f"{config.github.repo_owner}/{config.github.repo_name}",
         branch=test_branch,
         base_branch="main"
@@ -197,7 +196,7 @@ if __name__ == "__main__":
         return False
     
     # Create test file
-    file_created = await github.update_file(
+    file_created = github.update_file(
         repo=f"{config.github.repo_owner}/{config.github.repo_name}",
         path="test_agent.py",
         content=test_content,
@@ -210,7 +209,7 @@ if __name__ == "__main__":
         return False
     
     # Create PR
-    pr_url = await github.create_pull_request(
+    pr_url = github.create_pull_request(
         repo=f"{config.github.repo_owner}/{config.github.repo_name}",
         title="Test PR: Agent Test",
         body="This is a test PR for the PR Agent.",
@@ -334,261 +333,6 @@ async def process_specific_pr_developer(github, pr_processor, pr_number, notific
         logger.error(f"Failed to process PR: {result.message}")
         return False
 
-async def process_all_prs_review(github, pr_processor, notification_manager, config):
-    """Process all available PRs in review mode."""
-    logger = logging.getLogger(__name__)
-    
-    logger.info("Fetching all PRs for review...")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message="Starting to review all PRs",
-            level="info"
-        )
-    
-    # Get all PRs
-    prs = github.get_pull_requests(limit=config.github.pr_fetch_limit)
-    
-    if not prs:
-        logger.info("No PRs found to review")
-        return True
-    
-    logger.info(f"Found {len(prs)} PRs to review")
-    
-    success_count = 0
-    for pr in prs:
-        pr_info = github.get_pr_info_dict(pr.number)
-        if pr_info:
-            logger.info(f"Reviewing PR #{pr.number}: {pr.title}")
-            
-            result = await pr_processor.review_pr_only(pr_info)
-            
-            if result.success:
-                success_count += 1
-                logger.info(f"PR #{pr.number} reviewed successfully")
-            else:
-                logger.warning(f"PR #{pr.number} review failed: {result.message}")
-    
-    logger.info(f"Review completed! {success_count}/{len(prs)} PRs reviewed successfully")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message=f"Review completed! {success_count}/{len(prs)} PRs reviewed successfully",
-            level="info"
-        )
-    
-    return success_count > 0
-
-async def process_all_prs_developer(github, pr_processor, notification_manager, config):
-    """Process all available PRs in developer mode."""
-    logger = logging.getLogger(__name__)
-    
-    logger.info("Fetching all PRs for processing...")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message="Starting to process all PRs",
-            level="info"
-        )
-    
-    # Get all PRs
-    prs = github.get_pull_requests(limit=config.github.pr_fetch_limit)
-    
-    if not prs:
-        logger.info("No PRs found to process")
-        return True
-    
-    logger.info(f"Found {len(prs)} PRs to process")
-    
-    success_count = 0
-    for pr in prs:
-        pr_info = github.get_pr_info_dict(pr.number)
-        if pr_info:
-            logger.info(f"Processing PR #{pr.number}: {pr.title}")
-            
-            result = await pr_processor.process_pr(pr_info)
-            
-            if result.success:
-                success_count += 1
-                logger.info(f"PR #{pr.number} processed successfully")
-            else:
-                logger.warning(f"PR #{pr.number} processing failed: {result.message}")
-    
-    logger.info(f"Processing completed! {success_count}/{len(prs)} PRs processed successfully")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message=f"Processing completed! {success_count}/{len(prs)} PRs processed successfully",
-            level="info"
-        )
-    
-    return success_count > 0
-
-async def process_specific_issue_review(github, developer_agent, issue_number, notification_manager):
-    """Process a specific issue in review mode (analyze only, no changes)."""
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"Reviewing issue #{issue_number} (review mode)")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message=f"Starting to review issue #{issue_number} (review mode)",
-            level="info"
-        )
-    
-    issue_info = github.get_issue_info_dict(issue_number)
-    
-    if not issue_info:
-        logger.error(f"Could not get issue #{issue_number} info")
-        return False
-    
-    logger.info(f"Issue Title: {issue_info.get('title', 'No title')}")
-    logger.info(f"Issue URL: {issue_info.get('html_url', 'No URL')}")
-    
-    # Review the issue
-    try:
-        review_result = await developer_agent.review_code(
-            code=issue_info.get('body', ''),
-            language='markdown',
-            task_description=f"Review issue #{issue_number}: {issue_info.get('title', '')}"
-        )
-        
-        if review_result.get('success', False):
-            logger.info("Issue reviewed successfully!")
-            
-            # Add review comment to the issue
-            if review_result.get('feedback'):
-                comment_result = await developer_agent.add_issue_comment(
-                    issue_number=issue_number,
-                    comment=f"## Issue Review\n\n{review_result['feedback']}"
-                )
-                
-                if comment_result.get('success', False):
-                    logger.info("Review comment added to issue successfully")
-                else:
-                    logger.warning("Failed to add review comment to issue")
-            
-            if notification_manager:
-                await notification_manager.send_notification(
-                    message=f"Successfully reviewed issue #{issue_number}",
-                    level="info"
-                )
-            
-            return True
-        else:
-            logger.error(f"Failed to review issue: {review_result.get('message', 'Unknown error')}")
-            return False
-            
-    except Exception as e:
-        logger.error(f"Error reviewing issue: {str(e)}")
-        return False
-
-async def process_specific_issue_developer(github, developer_agent, issue_number, notification_manager):
-    """Process a specific issue in developer mode (analyze and create PR with implementation)."""
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"Processing issue #{issue_number} (developer mode)")
-    
-    if notification_manager:
-        await notification_manager.send_notification(
-            message=f"Starting to process issue #{issue_number} (developer mode)",
-            level="info"
-        )
-    
-    issue_info = github.get_issue_info_dict(issue_number)
-    
-    if not issue_info:
-        logger.error(f"Could not get issue #{issue_number} info")
-        return False
-    
-    logger.info(f"Issue Title: {issue_info.get('title', 'No title')}")
-    logger.info(f"Issue URL: {issue_info.get('html_url', 'No URL')}")
-    
-    # Process the issue by implementing the feature
-    try:
-        logger.info("Implementing feature from issue requirements...")
-        
-        # Use the new implement_feature_from_issue method
-        implementation_result = await developer_agent.implement_feature_from_issue(issue_info)
-        
-        if implementation_result.get('success', False):
-            logger.info("Feature implementation completed successfully!")
-            
-            pr_url = implementation_result.get('pr_url')
-            branch = implementation_result.get('branch')
-            files_created = implementation_result.get('files_created', [])
-            
-            logger.info(f"Pull Request created: {pr_url}")
-            logger.info(f"Feature branch: {branch}")
-            logger.info(f"Files created/updated: {len(files_created)}")
-            
-            # Send success notification
-            if notification_manager:
-                await notification_manager.send_notification(
-                    message=f"Successfully implemented feature from issue #{issue_number}. PR: {pr_url}",
-                    level="info"
-                )
-            
-            return True
-        else:
-            error_msg = f"Failed to implement feature from issue: {implementation_result.get('message', 'Unknown error')}"
-            logger.error(error_msg)
-            
-            # Add error comment to the issue
-            try:
-                error_comment = f"""
-## ❌ Feature Implementation Failed
-
-The AI agent encountered an error while trying to implement your feature:
-
-**Error:** {implementation_result.get('message', 'Unknown error')}
-
-Please check the issue description and try again, or contact the development team for assistance.
-                """
-                
-                await developer_agent.add_issue_comment(issue_number, error_comment)
-                logger.info(f"Added error comment to issue #{issue_number}")
-                
-            except Exception as comment_error:
-                logger.warning(f"Failed to add error comment to issue #{issue_number}: {comment_error}")
-            
-            if notification_manager:
-                await notification_manager.send_notification(
-                    message=f"Failed to implement feature from issue #{issue_number}: {error_msg}",
-                    level="error"
-                )
-            
-            return False
-            
-    except Exception as e:
-        logger.error(f"Error processing issue: {str(e)}")
-        
-        # Add error comment to the issue
-        try:
-            error_comment = f"""
-## ❌ Feature Implementation Failed
-
-The AI agent encountered an unexpected error:
-
-**Error:** {str(e)}
-
-Please try again or contact the development team for assistance.
-            """
-            
-            await developer_agent.add_issue_comment(issue_number, error_comment)
-            logger.info(f"Added error comment to issue #{issue_number}")
-            
-        except Exception as comment_error:
-            logger.warning(f"Failed to add error comment to issue #{issue_number}: {comment_error}")
-        
-        if notification_manager:
-            await notification_manager.send_notification(
-                message=f"Error processing issue #{issue_number}: {str(e)}",
-                level="error"
-            )
-        
-        return False
-
 async def process_all_items_review(github, pr_processor, developer_agent, notification_manager, config):
     """Process all available PRs and issues in review mode."""
     logger = logging.getLogger(__name__)
@@ -707,6 +451,171 @@ async def process_all_items_developer(github, pr_processor, developer_agent, not
     
     return success_count > 0
 
+async def process_specific_issue_review(github, developer_agent, issue_number, notification_manager):
+    """Process a specific issue in review mode (analyze only, no changes)."""
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Reviewing issue #{issue_number} (review mode)")
+    
+    if notification_manager:
+        await notification_manager.send_notification(
+            message=f"Starting to review issue #{issue_number} (review mode)",
+            level="info"
+        )
+    
+    issue_info = github.get_issue_info_dict(issue_number)
+    
+    if not issue_info:
+        logger.error(f"Could not get issue #{issue_number} info")
+        return False
+    
+    logger.info(f"Issue Title: {issue_info.get('title', 'No title')}")
+    logger.info(f"Issue URL: {issue_info.get('html_url', 'No URL')}")
+    
+    # Review the issue
+    try:
+        review_result = await developer_agent.review_code(
+            code=issue_info.get('body', ''),
+            language='``',
+            task_description=f"Review issue #{issue_number}: {issue_info.get('title', '')}"
+        )
+        
+        if review_result.get('success', False):
+            logger.info("Issue reviewed successfully!")
+            
+            # Add review comment to the issue
+            if review_result.get('feedback'):
+                comment_result = await developer_agent.add_issue_comment(
+                    issue_number=issue_number,
+                    comment=f"```\n{review_result['feedback']}\n```"
+                )
+                
+                if comment_result.get('success', False):
+                    logger.info("Review comment added to issue successfully")
+                else:
+                    logger.warning("Failed to add review comment to issue")
+            
+            if notification_manager:
+                await notification_manager.send_notification(
+                    message=f"Successfully reviewed issue #{issue_number}",
+                    level="info"
+                )
+            
+            return True
+        else:
+            logger.error(f"Failed to review issue: {review_result.get('message', 'Unknown error')}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error reviewing issue: {str(e)}")
+        return False
+
+async def process_specific_issue_developer(github, developer_agent, issue_number, notification_manager):
+    """Process a specific issue in developer mode (analyze and create PR with implementation)."""
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"Processing issue #{issue_number} (developer mode)")
+    
+    if notification_manager:
+        await notification_manager.send_notification(
+            message=f"Starting to process issue #{issue_number} (developer mode)",
+            level="info"
+        )
+    
+    issue_info = github.get_issue_info_dict(issue_number)
+    
+    if not issue_info:
+        logger.error(f"Could not get issue #{issue_number} info")
+        return False
+    
+    logger.info(f"Issue Title: {issue_info.get('title', 'No title')}")
+    logger.info(f"Issue URL: {issue_info.get('html_url', 'No URL')}")
+    
+    # Process the issue by implementing the feature
+    try:
+        logger.info("Implementing feature from issue requirements...")
+        
+        # Use the new implement_feature_from_issue method
+        implementation_result = await developer_agent.implement_feature_from_issue(issue_info)
+        
+        if implementation_result.get('success', False):
+            logger.info("Feature implementation completed successfully!")
+            
+            pr_url = implementation_result.get('pr_url')
+            branch = implementation_result.get('branch')
+            files_created = implementation_result.get('files_created', [])
+            
+            logger.info(f"Pull Request created: {pr_url}")
+            logger.info(f"Feature branch: {branch}")
+            logger.info(f"Files created/updated: {len(files_created)}")
+            
+            # Send success notification
+            if notification_manager:
+                await notification_manager.send_notification(
+                    message=f"Successfully implemented feature from issue #{issue_number}. PR: {pr_url}",
+                    level="info"
+                )
+            
+            return True
+        else:
+            error_msg = f"Failed to implement feature from issue: {implementation_result.get('message', 'Unknown error')}"
+            logger.error(error_msg)
+            
+            # Add error comment to the issue
+            try:
+                error_comment = f"""
+##  Feature Implementation Failed
+
+The AI agent encountered an error while trying to implement your feature:
+
+**Error:** {implementation_result.get('message', 'Unknown error')}
+
+Please check the issue description and try again, or contact the development team for assistance.
+                """
+                
+                await developer_agent.add_issue_comment(issue_number, error_comment)
+                logger.info(f"Added error comment to issue #{issue_number}")
+                
+            except Exception as comment_error:
+                logger.warning(f"Failed to add error comment to issue #{issue_number}: {comment_error}")
+            
+            if notification_manager:
+                await notification_manager.send_notification(
+                    message=f"Failed to implement feature from issue #{issue_number}: {error_msg}",
+                    level="error"
+                )
+            
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error processing issue: {str(e)}")
+        
+        # Add error comment to the issue
+        try:
+            error_comment = f"""
+##  Feature Implementation Failed
+
+The AI agent encountered an unexpected error:
+
+**Error:** {str(e)}
+
+Please try again or contact the development team for assistance.
+            """
+            
+            await developer_agent.add_issue_comment(issue_number, error_comment)
+            logger.info(f"Added error comment to issue #{issue_number}")
+            
+        except Exception as comment_error:
+            logger.warning(f"Failed to add error comment to issue #{issue_number}: {comment_error}")
+        
+        if notification_manager:
+            await notification_manager.send_notification(
+                message=f"Error processing issue #{issue_number}: {str(e)}",
+                level="error"
+            )
+        
+        return False
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -743,18 +652,14 @@ Examples:
     
     args = parser.parse_args()
     
-    # Setup logging
     setup_logging(verbose=args.verbose, quiet=args.quiet)
     
-    # Determine notification setting
-    notifications = not args.no_notify  # Default to True unless --no-notify is specified
+    notifications = not args.no_notify  
     
-    # Determine modes
     review_mode = args.review
     developer_mode = args.developer
     test_mode = args.test
     
-    # Validate mode arguments
     if review_mode and developer_mode:
         print("Error: Cannot use both --review and --developer modes at the same time")
         sys.exit(1)
