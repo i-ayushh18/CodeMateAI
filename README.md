@@ -6,7 +6,7 @@ An intelligent AI-powered agent that automatically reviews pull requests, sugges
 
 ### 1. **Setup**
 ```bash
-git clone https://github.com/<your-username>/CodeMateAI.git
+git clone https://github.com/i-ayushh18/CodeMateAI.git
 cd CodeMateAI
 cp config.toml.template config.toml
 # Edit config.toml with your GitHub token and Perplexity API key
