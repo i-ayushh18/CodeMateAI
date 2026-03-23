@@ -3,8 +3,8 @@
 # GitHub API token (set via environment variable GITHUB_TOKEN or add here)
 token = ""
 # Repository details - Update with your repository
-repo_owner = "your-username"
-repo_name = "your-repo"
+repo_owner = "i-ayushh18"
+repo_name = "testrepo"
 # PR processing settings
 pr_fetch_limit = 3  # Reduced for demo purposes
 # Set to true to process draft PRs
@@ -12,8 +12,10 @@ include_drafts = false
 
 [perplexity]
 # Perplexity API key (set via environment variable PERPLEXITY_API_KEY or add here)
-api_key = ""
-model = "sonar-pro"
+api_key = "pplx-your-actual-perplexity-api-key-here"
+model = "llama-3.1-70b-instruct"
+temperature = 0.7
+max_tokens = 4000
 
 # Notification Settings
 [notifications]

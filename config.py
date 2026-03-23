@@ -28,9 +28,9 @@ class GitHubConfig:
 class PerplexityConfig:
     """Perplexity AI configuration."""
     api_key: str = ""
-    model: str = "sonar-pro"
+    model: str = "llama-3.1-70b-instruct"
     temperature: float = 0.7
-    max_tokens: int = 2000
+    max_tokens: int = 4000
 
 @dataclass
 class NotificationConfig:
@@ -81,13 +81,13 @@ def load_config(config_path: str = "config.toml") -> Config:
     Load configuration from a TOML file.
     
     Args:
-        config_path: Path to the TOML configuration file
+        config_path: Path to TOML configuration file
         
     Returns:
         Config: Loaded configuration
     """
     try:
-        # Read the TOML file
+        # Read TOML file
         with open(config_path, "rb") as f:
             config_data = toml.load(f)
         
@@ -113,9 +113,9 @@ def load_config(config_path: str = "config.toml") -> Config:
             perplexity_api_key = os.getenv('PERPLEXITY_API_KEY', perplexity_data.get('api_key', ''))
             config.perplexity = PerplexityConfig(
                 api_key=perplexity_api_key,
-                model=perplexity_data.get('model', 'sonar-pro'),
+                model=perplexity_data.get('model', 'llama-3.1-70b-instruct'),
                 temperature=float(perplexity_data.get('temperature', 0.7)),
-                max_tokens=int(perplexity_data.get('max_tokens', 2000))
+                max_tokens=int(perplexity_data.get('max_tokens', 4000))
             )
         
         # Notifications config
