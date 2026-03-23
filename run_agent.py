@@ -20,8 +20,10 @@ Options:
 import asyncio
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
+
 
 # Add the current directory to Python path
 sys.path.append(str(Path(__file__).parent))
@@ -76,6 +78,14 @@ async def run_agent(pr_number=None, issue_number=None, repo=None, test_mode=Fals
             api_key=config.perplexity.api_key,
             model=config.perplexity.model
         )
+        
+        # Debug: Print the actual model being used
+        print(f"🔍 DEBUG: Using Perplexity model: {config.perplexity.model}")
+        
+        # Test connection
+        if not llm.test_connection():
+            logger.error("Failed to connect to Perplexity API!")
+            return
         
         notification_manager = None
         if notifications:
@@ -485,12 +495,12 @@ async def process_specific_issue_review(github, developer_agent, issue_number, n
             
             # Add review comment to the issue
             if review_result.get('feedback'):
-                comment_result = await developer_agent.add_issue_comment(
+                comment_result = github.add_issue_comment(
                     issue_number=issue_number,
                     comment=f"```\n{review_result['feedback']}\n```"
                 )
                 
-                if comment_result.get('success', False):
+                if comment_result:
                     logger.info("Review comment added to issue successfully")
                 else:
                     logger.warning("Failed to add review comment to issue")
@@ -573,7 +583,7 @@ The AI agent encountered an error while trying to implement your feature:
 Please check the issue description and try again, or contact the development team for assistance.
                 """
                 
-                await developer_agent.add_issue_comment(issue_number, error_comment)
+                github.add_issue_comment(issue_number, error_comment)
                 logger.info(f"Added error comment to issue #{issue_number}")
                 
             except Exception as comment_error:
@@ -602,7 +612,7 @@ The AI agent encountered an unexpected error:
 Please try again or contact the development team for assistance.
             """
             
-            await developer_agent.add_issue_comment(issue_number, error_comment)
+            github.add_issue_comment(issue_number, error_comment)
             logger.info(f"Added error comment to issue #{issue_number}")
             
         except Exception as comment_error:
@@ -682,6 +692,7 @@ Examples:
     else:
         print("PR Agent failed!")
         sys.exit(1)
+    
 
 if __name__ == "__main__":
-    main() 
+    main()
