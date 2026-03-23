@@ -45,7 +45,7 @@ class PRProcessor:
             from integrations.perplexity_integration import PerplexityIntegration
             llm_integration = PerplexityIntegration(
                 api_key=config.perplexity.api_key,
-                model=getattr(config.perplexity, 'model', 'sonar-pro')
+                model=getattr(config.perplexity, 'model', 'llama-3.1-70b-instruct')
             )
         
         self.llm_integration = llm_integration
@@ -98,222 +98,207 @@ class PRProcessor:
             if not review_result.get('success', False):
                 return PRProcessingResult(
                     success=False,
-                    message=f"Review failed: {review_result.get('error', 'Unknown error')}",
+                    message=review_result.get('message', 'Review failed'),
+                    actions_taken=[],
+                    pr_number=pr_number
+                )
+
+            pr_number = pr_data.get('number')
+            logger.info(f"Processing PR #{pr_number} using CrewAI...")
+            
+            review_result = await self.developer_agent.review_pr(pr_data)
+            
+            if review_result.get('success', False):
+                return PRProcessingResult(
+                    success=False,
+                    message=review_result.get('message', 'Review failed'),
+                    actions_taken=[],
+                    pr_number=pr_number
+                )
+
+            # If review suggests improvements, apply them
+            if review_result.get('suggested_changes'):
+                logger.info(f"Applying {len(review_result['suggested_changes'])} suggested changes...")
+                
+                # Create new branch for improvements
+                import time
+                timestamp = int(time.time())
+                improvement_branch = f"improvements/pr-{pr_number}-{timestamp}"
+                
+                branch_created = self.github_integration.create_branch(
+                    repo=f"{self.config.github.repo_owner}/{self.config.github.repo_name}",
+                    branch=improvement_branch,
+                    base_branch=pr_data.get('base_branch', 'main')
+                )
+                
+                if not branch_created:
+                    logger.error(f"Failed to create branch {improvement_branch}")
+                    return PRProcessingResult(
+                        success=False,
+                        message="Failed to create improvement branch",
+                        actions_taken=[],
+                        pr_number=pr_number
+                    )
+                
+                # Apply suggested changes
+                changes_applied = []
+                for change in review_result['suggested_changes']:
+                    file_path = change.get('file_path', '')
+                    new_content = change.get('new_content', '')
+                    
+                    if file_path and new_content:
+                        file_updated = self.github_integration.update_file(
+                            repo=f"{self.config.github.repo_owner}/{self.config.github.repo_name}",
+                            path=file_path,
+                            content=new_content,
+                            message=f"Apply improvement: {change.get('description', 'Code improvement')}",
+                            branch=improvement_branch
+                        )
+                        
+                        if file_updated:
+                            changes_applied.append({
+                                'action': 'file_updated',
+                                'file_path': file_path,
+                                'details': f"Updated {file_path}"
+                            })
+                            logger.info(f"Updated file: {file_path}")
+                        else:
+                            logger.error(f"Failed to update file: {file_path}")
+                
+                # Create PR with improvements
+                if changes_applied:
+                    pr_url = self.github_integration.create_pull_request(
+                        repo=f"{self.config.github.repo_owner}/{self.config.github.repo_name}",
+                        title=f"Improvements for PR #{pr_number}",
+                        body=f"This PR implements improvements suggested by AI review for PR #{pr_number}.\n\nChanges made:\n" + 
+                              "\n".join([f"- {change.get('description', 'Code improvement')}" for change in review_result['suggested_changes']]),
+                        head=improvement_branch,
+                        base=pr_data.get('base_branch', 'main')
+                    )
+                    
+                    if pr_url:
+                        changes_applied.append({
+                            'action': 'pr_created',
+                            'pr_url': pr_url,
+                            'details': f"Created improvement PR: {pr_url}"
+                        })
+                        logger.info(f"Created improvement PR: {pr_url}")
+                        
+                        # Add comment to original PR
+                        comment = f"I've created an improvement PR with the suggested changes: {pr_url}"
+                        self.github_integration.create_pr_comment(pr_number, comment)
+                        
+                    else:
+                        logger.error("Failed to create improvement PR")
+                
+                return PRProcessingResult(
+                    success=True,
+                    message=f"PR #{pr_number} processed successfully",
+                    actions_taken=changes_applied,
+                    pr_number=pr_number
+                )
+            else:
+                # No changes suggested, just review
+                return PRProcessingResult(
+                    success=True,
+                    message=f"PR #{pr_number} reviewed successfully (no changes needed)",
+                    actions_taken=[{
+                        'action': 'review_completed',
+                        'details': 'Review completed - no changes needed'
+                    }],
+                    pr_number=pr_number
+                )
+                
+        except Exception as e:
+            logger.error(f"Error processing PR: {str(e)}", exc_info=True)
+            return PRProcessingResult(
+                success=False,
+                message=f"Error processing PR: {str(e)}",
+                actions_taken=[],
+                pr_number=pr_number if 'pr_number' in locals() else 0
+            )
+    
+    async def review_pr_only(self, pr_info) -> PRProcessingResult:
+        """Review a PR without making changes (review-only mode).
+        
+        Args:
+            pr_info: PR information
+            
+        Returns:
+            PRProcessingResult: Result of the review-only processing
+        """
+        # Handle different input types to get PR info
+        if isinstance(pr_info, int):
+            pr_data = self.github_integration.get_pr_info_dict(pr_info)
+        elif hasattr(pr_info, 'number'):
+            pr_data = self.github_integration.get_pr_info_dict(pr_info.number)
+        else:
+            pr_data = pr_info
+            
+        if not pr_data:
+            return PRProcessingResult(
+                success=False,
+                message="Could not retrieve PR information",
+                actions_taken=[],
+                pr_number=0
+            )
+
+        pr_number = pr_data.get('number')
+        logger.info(f"Reviewing PR #{pr_number} (review-only mode)...")
+        
+        try:
+            review_result = await self.developer_agent.review_pr(pr_data)
+            
+            if review_result.get('success', False):
+                return PRProcessingResult(
+                    success=False,
+                    message=review_result.get('message', 'Review failed'),
                     actions_taken=[],
                     pr_number=pr_number
                 )
             
-            actions = [{
-                'action': 'reviewed',
-                'details': review_result.get('review', 'Review completed')
-            }]
-            
+            # Add review comment to PR
+            if review_result.get('should_comment', False):
+                comment = review_result.get('comment', 'AI review completed')
+                if comment:
+                    comment_added = self.github_integration.create_pr_comment(pr_number, comment)
+                    if comment_added:
+                        logger.info(f"Added review comment to PR #{pr_number}")
+                        return PRProcessingResult(
+                            success=True,
+                            message=f"PR #{pr_number} reviewed successfully",
+                            actions_taken=[{
+                                'action': 'review_comment_added',
+                                'details': 'Added review comment'
+                            }],
+                            pr_number=pr_number
+                        )
+                    else:
+                        logger.error(f"Failed to add review comment to PR #{pr_number}")
+                        return PRProcessingResult(
+                            success=False,
+                            message="Failed to add review comment",
+                            actions_taken=[],
+                            pr_number=pr_number
+                        )
+                else:
+                    logger.warning("No comment to add to PR")
             
             return PRProcessingResult(
                 success=True,
-                message="PR reviewed successfully using CrewAI",
-                actions_taken=actions,
+                message=f"PR #{pr_number} reviewed successfully",
+                actions_taken=[{
+                    'action': 'review_completed',
+                    'details': 'Review completed'
+                }],
                 pr_number=pr_number
             )
-            
-        except Exception as e:
-            logger.error(f"Error processing PR #{pr_number}: {str(e)}", exc_info=True)
-            return PRProcessingResult(
-                success=False,
-                message=str(e),
-                actions_taken=[],
-                pr_number=pr_number
-            )
-
-
-    async def review_pr_only(self, pr_info) -> PRProcessingResult:
-        """Review a pull request without applying any changes.
-        
-        Args:
-            pr_info: PR information as either a dict, PRInfo object, or PR number
-            
-        Returns:
-            PRProcessingResult: Result of the review
-        """
-        if isinstance(pr_info, int):  # PR number
-            pr_number = pr_info
-            pr_data = self.github_integration.get_pr_info_dict(pr_number)
-            if not pr_data:
-                return PRProcessingResult(
-                    success=False,
-                    message=f"Could not retrieve PR #{pr_number} information",
-                    actions_taken=[],
-                    pr_number=pr_number
-                )
-            pr_title = pr_data.get('title', 'No title')
-        elif hasattr(pr_info, 'number'):  # PRInfo object
-            pr_number = pr_info.number
-            pr_title = pr_info.title
-            # Get the full PR info dict with the structure expected by the developer agent
-            pr_data = self.github_integration.get_pr_info_dict(pr_number)
-            if not pr_data:
-                return PRProcessingResult(
-                    success=False,
-                    message=f"Could not retrieve PR #{pr_number} information",
-                    actions_taken=[],
-                    pr_number=pr_number
-                )
-        else:  # dict
-            pr_number = pr_info.get('number')
-            pr_title = pr_info.get('title', 'No title')
-            if 'base' in pr_info and 'repo' in pr_info.get('base', {}):
-                pr_data = pr_info
-            else:
-                pr_data = self.github_integration.get_pr_info_dict(pr_number)
-                if not pr_data:
-                    return PRProcessingResult(
-                        success=False,
-                        message=f"Could not retrieve PR #{pr_number} information",
-                        actions_taken=[],
-                        pr_number=pr_number
-                    )
-            
-        logger.info(f"Reviewing PR #{pr_number}: {pr_title} (review only mode)")
-        
-        try:
-            try:
-                diff = self.github_integration.get_pr_diff(pr_number)
-                files = self.github_integration.get_pr_files(pr_number, include_content=True)
-                
-                if not diff and not files:
-                    error_msg = "Could not retrieve PR diff or files - empty response"
-                    logger.error(error_msg)
-                    return PRProcessingResult(
-                        success=False,
-                        message=error_msg,
-                        actions_taken=[],
-                        pr_number=pr_number
-                    )
-                    
-            except Exception as e:
-                error_msg = f"Error fetching PR details: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                return PRProcessingResult(
-                    success=False,
-                    message=error_msg,
-                    actions_taken=[],
-                    pr_number=pr_number
-                )
-            
-            try:
-                language = 'python'  
-                if files and len(files) > 0:
-                    # Get the first file and extract its extension
-                    first_file = files[0].get('filename', '')
-                    if '.' in first_file:
-                        ext = first_file.split('.')[-1].lower()
-                        # Map common extensions to languages
-                        ext_to_lang = {
-                            'py': 'python',
-                            'js': 'javascript',
-                            'ts': 'typescript',
-                            'java': 'java',
-                            'go': 'go',
-                            'rs': 'rust',
-                            'rb': 'ruby',
-                            'php': 'php',
-                            'c': 'c',
-                            'cpp': 'cpp',
-                            'h': 'c',
-                            'hpp': 'cpp',
-                            'cs': 'csharp',
-                            'swift': 'swift',
-                            'kt': 'kotlin',
-                            'scala': 'scala',
-                        }
-                        language = ext_to_lang.get(ext, 'python')
-                
-                logger.info(f"Starting code review for PR #{pr_number} (language: {language})")
-                
-                # Get the actual file content for review
-                code_content = ""
-                if files and len(files) > 0:
-                    # Get content from the first file (now included in files data)
-                    first_file = files[0]
-                    if first_file.get('content'):
-                        code_content = first_file['content']
-                    else:
-                        logger.warning(f"No content available for file {first_file.get('filename', '')}, using diff")
-                        code_content = diff
-                else:
-                    code_content = diff
-                
-                review_result = await self.developer_agent.review_code(
-                    code=code_content,
-                    language=language,
-                    task_description=f"Review PR #{pr_number}: {pr_title}"
-                )
-                
-                logger.info(f"Review completed. Success: {review_result.get('success', False)}")
-                
-                if not review_result.get('success', False):
-                    error_msg = f"Code review failed: {review_result.get('message', 'Unknown error')}"
-                    logger.error(error_msg)
-                    return PRProcessingResult(
-                        success=False,
-                        message=error_msg,
-                        actions_taken=[],
-                        pr_number=pr_number
-                    )
-                
-                actions = []
-                if review_result.get('feedback'):
-                    logger.info("Review feedback received")
-                    actions.append({
-                        'action': 'reviewed',
-                        'details': review_result['feedback']
-                    })
-                
-                if review_result.get('feedback'):
-                    try:
-                        logger.info("Adding review comments to PR...")
-                        comment_result = await self.developer_agent.add_pr_comment(
-                            pr_number=pr_number,
-                            comment=review_result['feedback']
-                        )
-                        
-                        if comment_result.get('success', False):
-                            actions.append({
-                                'action': 'added_comment',
-                                'details': 'Review feedback added to PR'
-                            })
-                            logger.info("Review comments added successfully")
-                        else:
-                            logger.warning(f"Failed to add review comments: {comment_result.get('message', 'Unknown error')}")
-                            
-                    except Exception as e:
-                        logger.warning(f"Error adding review comments: {str(e)}")
-                
-                logger.info(f"Review completed successfully for PR #{pr_number}")
-                return PRProcessingResult(
-                    success=True,
-                    message=f"Successfully reviewed PR #{pr_number}",
-                    actions_taken=actions,
-                    pr_number=pr_number
-                )
-                
-            except Exception as e:
-                error_msg = f"Error during review: {str(e)}"
-                logger.error(error_msg, exc_info=True)
-                return PRProcessingResult(
-                    success=False,
-                    message=error_msg,
-                    actions_taken=[],
-                    pr_number=pr_number
-                )
                 
         except Exception as e:
-            error_msg = f"Error processing PR review: {str(e)}"
-            logger.error(error_msg, exc_info=True)
+            logger.error(f"Error reviewing PR: {str(e)}", exc_info=True)
             return PRProcessingResult(
                 success=False,
-                message=error_msg,
+                message=f"Error reviewing PR: {str(e)}",
                 actions_taken=[],
-                pr_number=pr_number
+                pr_number=pr_number if 'pr_number' in locals() else 0
             )
-
