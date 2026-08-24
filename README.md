@@ -9,7 +9,7 @@ An intelligent AI-powered agent that automatically reviews pull requests, sugges
 git clone https://github.com/i-ayushh18/CodeMateAI.git
 cd CodeMateAI
 cp config.toml.template config.toml
-# Edit config.toml with your GitHub token and Perplexity API key
+# Edit config.toml with your GitHub token and OpenRouter API key
 ```
 
 ### 2. **Install & Run**
@@ -57,10 +57,13 @@ Set your API keys in `config.toml`:
 [github]
 token = "your_github_token"
 repo_owner = "your-username"
+[github]
+token = "your_github_token"
+repo_owner = "your-username"
 repo_name = "your-repo"
 
-[perplexity]
-api_key = "your_perplexity_key"
+[openrouter]
+api_key = "your_openrouter_key"
 ```
 
 ## 🐳 **Docker (Optional)**
