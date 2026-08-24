@@ -149,13 +149,19 @@ config.toml
 .env
 .env.local
 .env.production
+.env.development
 secrets.json
 credentials.json
+*_secret.*
+*.pem
+*.key
 
 # Test files
 test_*.py
 *_test.py
 tests/
+debug_*.txt
+*_output.txt
 
 # Backup files
 backup_*/
