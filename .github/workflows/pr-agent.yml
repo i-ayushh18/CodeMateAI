@@ -32,7 +32,7 @@ jobs:
           python run_agent.py --review --pr ${{ github.event.pull_request.number }} --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Run PR Agent (Manual)
         if: github.event_name == 'workflow_dispatch'
@@ -40,4 +40,4 @@ jobs:
           python run_agent.py --review --pr ${{ github.event.inputs.pr_number }} --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PERPLEXITY_API_KEY: ${{ secrets.PERPLEXITY_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
