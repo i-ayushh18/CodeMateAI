@@ -10,10 +10,17 @@ pr_fetch_limit = 3  # Reduced for demo purposes
 # Set to true to process draft PRs
 include_drafts = false
 
-[perplexity]
-# Perplexity API key (set via environment variable PERPLEXITY_API_KEY or add here)
-api_key = "pplx-your-actual-perplexity-api-key-here"
-model = "llama-3.1-70b-instruct"
+[openrouter]
+# OpenRouter API key (set via environment variable OPENROUTER_API_KEY or add here)
+# Get your free API key at: https://openrouter.ai/keys
+api_key = ""
+
+# Model to use - Popular free/low-cost models:
+# - meta-llama/llama-3.1-70b-instruct (recommended, powerful)
+# - meta-llama/llama-3.1-8b-instruct (faster, lighter)
+# - mistralai/mistral-7b-instruct (good performance)
+# - google/gemma-7b-it (Google's free model)
+model = "meta-llama/llama-3.1-70b-instruct"
 temperature = 0.7
 max_tokens = 4000
 
