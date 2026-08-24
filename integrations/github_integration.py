@@ -262,7 +262,10 @@ class GitHubIntegration:
                         try:
                             repo = self.get_repository()
                             head_ref = pr.head.ref if hasattr(pr, 'head') and hasattr(pr.head, 'ref') else 'main'
-                            content = repo.get_contents(f.filename, ref=head_ref).decoded_content.decode('utf-8')
+                            file_content = repo.get_contents(f.filename, ref=head_ref)
+                            if isinstance(file_content, list):
+                                file_content = file_content[0]
+                            content = file_content.decoded_content.decode('utf-8')
                             file_info['content'] = content
                         except Exception as content_err:
                             logger.warning(f"Could not get content for file {f.filename}: {str(content_err)}")
@@ -350,6 +353,8 @@ class GitHubIntegration:
             for file_path, content in files_to_commit.items():
                 try:
                     file = repo.get_contents(file_path, ref=branch_name)
+                    if isinstance(file, list):
+                        file = file[0]
                     repo.update_file(file_path, commit_message, content, file.sha, branch=branch_name)
                     logger.info(f"Updated file {file_path} in branch {branch_name}")
                 except Exception:
@@ -398,16 +403,16 @@ class GitHubIntegration:
             comments_added = []
 
             commits = list(pr.get_commits())
-            commit_id = commits[-1].sha if commits else None
+            latest_commit = commits[-1] if commits else None
 
             for comment in comments:
-                if "file_path" in comment and "line" in comment and "body" in comment and commit_id:
+                if "file_path" in comment and "line" in comment and "body" in comment and latest_commit:
                     comment_added = self.add_review_comment(
                         pr=pr,
                         body=comment["body"],
-                        commit_id=commit_id,
+                        commit=latest_commit,
                         path=comment["file_path"],
-                        position=comment["line"]
+                        line=comment["line"]
                     )
                     if comment_added:
                         comments_added.append(comment)
@@ -415,7 +420,7 @@ class GitHubIntegration:
             return {
                 "status": "success" if review_submitted else "partial",
                 "message": f"Review submitted with {len(comments_added)} comments",
-                "review_id": f"review-{actual_pr_number}-{commit_id[-8:]}" if commit_id else f"review-{actual_pr_number}",
+                "review_id": f"review-{actual_pr_number}-{latest_commit.sha[-8:]}" if latest_commit else f"review-{actual_pr_number}",
                 "comments_added": len(comments_added)
             }
 
@@ -443,23 +448,23 @@ class GitHubIntegration:
             logger.error(f"Error submitting review for PR #{pr.number}: {str(e)}")
             return False
 
-    def add_review_comment(self, pr: PullRequest.PullRequest, body: str, commit_id: str, path: str, position: int) -> bool:
+    def add_review_comment(self, pr: PullRequest.PullRequest, body: str, commit: Any, path: str, line: int) -> bool:
         """Add a review comment to a specific line in a pull request.
         
         Args:
             pr: Pull request object
             body: Comment body text
-            commit_id: Commit SHA
+            commit: Commit object (github.Commit.Commit)
             path: File path
-            position: Line position
+            line: Line number in the file
             
         Returns:
             bool: True if successful, False otherwise
         """
         try:
             # Add the review comment
-            pr.create_review_comment(body=body, commit_id=commit_id, path=path, position=position)
-            logger.info(f"Added review comment to PR #{pr.number} on {path}:{position}")
+            pr.create_review_comment(body=body, commit=commit, path=path, line=line)
+            logger.info(f"Added review comment to PR #{pr.number} on {path}:{line}")
             return True
         except Exception as e:
             logger.error(f"Error adding review comment to PR #{pr.number}: {str(e)}")
@@ -471,7 +476,7 @@ class GitHubIntegration:
         path: str, 
         content: str, 
         message: str, 
-        branch: str = None
+        branch: Optional[str] = None
     ) -> bool:
         """Update a file in the repository.
         
@@ -495,6 +500,8 @@ class GitHubIntegration:
             # Try to get the file to update
             try:
                 file = github_repo.get_contents(path, ref=branch)
+                if isinstance(file, list):
+                    file = file[0]
                 # File exists, update it
                 github_repo.update_file(
                     path=path,
@@ -528,8 +535,8 @@ class GitHubIntegration:
         self, 
         pr_number: int, 
         merge_method: str = "merge", 
-        commit_title: str = None,
-        commit_message: str = None
+        commit_title: Optional[str] = None,
+        commit_message: Optional[str] = None
     ) -> Dict[str, Any]:
         """Merge a pull request.
         
@@ -590,11 +597,11 @@ class GitHubIntegration:
             
             # Attempt to merge
             if merge_method == 'merge':
-                result = pr.merge(**merge_params)
+                result = pr.merge(merge_method="merge", **merge_params)
             elif merge_method == 'squash':
-                result = pr.merge(squash=True, **merge_params)
+                result = pr.merge(merge_method="squash", **merge_params)
             elif merge_method == 'rebase':
-                result = pr.merge(rebase=True, **merge_params)
+                result = pr.merge(merge_method="rebase", **merge_params)
             else:
                 return {
                     'success': False,
