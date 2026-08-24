@@ -30,7 +30,7 @@ sys.path.append(str(Path(__file__).parent))
 
 from config import load_config
 from integrations.github_integration import GitHubIntegration
-from integrations.perplexity_integration import PerplexityIntegration
+from integrations.openrouter_integration import OpenRouterIntegration
 from agents.developer_agent import DeveloperAgent
 from agents.notification_manager import NotificationManager
 from services.pr_processor import PRProcessor
@@ -74,17 +74,17 @@ async def run_agent(pr_number=None, issue_number=None, repo=None, test_mode=Fals
         logger.info("Initializing components...")
         
         github = GitHubIntegration(github_config=config.github)
-        llm = PerplexityIntegration(
-            api_key=config.perplexity.api_key,
-            model=config.perplexity.model
+        llm = OpenRouterIntegration(
+            api_key=config.openrouter.api_key,
+            model=config.openrouter.model
         )
         
         # Debug: Print the actual model being used
-        print(f"🔍 DEBUG: Using Perplexity model: {config.perplexity.model}")
+        logger.info(f"DEBUG: Using OpenRouter model: {config.openrouter.model}")
         
         # Test connection
         if not llm.test_connection():
-            logger.error("Failed to connect to Perplexity API!")
+            logger.error("Failed to connect to OpenRouter API!")
             return
         
         notification_manager = None

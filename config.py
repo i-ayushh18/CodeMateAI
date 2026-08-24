@@ -25,10 +25,10 @@ class GitHubConfig:
     include_drafts: bool = False
 
 @dataclass
-class PerplexityConfig:
-    """Perplexity AI configuration."""
+class OpenRouterConfig:
+    """OpenRouter AI configuration."""
     api_key: str = ""
-    model: str = "llama-3.1-70b-instruct"
+    model: str = "meta-llama/llama-3.1-70b-instruct"
     temperature: float = 0.7
     max_tokens: int = 4000
 
@@ -70,7 +70,7 @@ class CodeReviewConfig:
 class Config:
     """Main configuration class."""
     github: GitHubConfig = field(default_factory=GitHubConfig)
-    perplexity: PerplexityConfig = field(default_factory=PerplexityConfig)
+    openrouter: OpenRouterConfig = field(default_factory=OpenRouterConfig)
     notifications: NotificationConfig = field(default_factory=NotificationConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
@@ -107,15 +107,15 @@ def load_config(config_path: str = "config.toml") -> Config:
                 include_drafts=github_data.get('include_drafts', False)
             )
         
-        # Perplexity config
-        if 'perplexity' in config_data:
-            perplexity_data = config_data['perplexity']
-            perplexity_api_key = os.getenv('PERPLEXITY_API_KEY', perplexity_data.get('api_key', ''))
-            config.perplexity = PerplexityConfig(
-                api_key=perplexity_api_key,
-                model=perplexity_data.get('model', 'llama-3.1-70b-instruct'),
-                temperature=float(perplexity_data.get('temperature', 0.7)),
-                max_tokens=int(perplexity_data.get('max_tokens', 4000))
+        # OpenRouter config
+        if 'openrouter' in config_data:
+            openrouter_data = config_data['openrouter']
+            openrouter_api_key = os.getenv('OPENROUTER_API_KEY', openrouter_data.get('api_key', ''))
+            config.openrouter = OpenRouterConfig(
+                api_key=openrouter_api_key,
+                model=openrouter_data.get('model', 'meta-llama/llama-3.1-70b-instruct'),
+                temperature=float(openrouter_data.get('temperature', 0.7)),
+                max_tokens=int(openrouter_data.get('max_tokens', 4000))
             )
         
         # Notifications config

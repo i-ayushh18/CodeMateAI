@@ -1,4 +1,5 @@
 # Integrations package initialization
-from .perplexity_integration import PerplexityIntegration
+from .openrouter_integration import OpenRouterIntegration
+from .github_integration import GitHubIntegration
 
-__all__ = ['PerplexityIntegration']
+__all__ = ['OpenRouterIntegration', 'GitHubIntegration']
