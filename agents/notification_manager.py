@@ -77,7 +77,6 @@ Sent by PR Agentic Workflow
     async def _send_via_curl(self, to_emails: List[str], subject: str, message: str) -> bool:
         try:
             import json
-            import platform
             
             payload = {
                 "email": to_emails[0] if to_emails else "",
@@ -87,22 +86,15 @@ Sent by PR Agentic Workflow
             
             json_payload = json.dumps(payload)
             
-            if platform.system() == "Windows":
-                cmd = [
-                    "curl",
-                    "-X", "POST",
-                    "https://your-notification-service.com/api/send-email",
-                    "-H", "Content-Type: application/json",
-                    "-d", json_payload
-                ]
-            else:
-                cmd = [
-                    "curl",
-                    "-X", "POST",
-                    "https://your-notification-service.com/api/send-email",
-                    "-H", "Content-Type: application/json",
-                    "-d", json_payload
-                ]
+            curl_url = self.config.curl_command or "https://your-notification-service.com/api/send-email"
+            
+            cmd = [
+                "curl",
+                "-X", "POST",
+                curl_url,
+                "-H", "Content-Type: application/json",
+                "-d", json_payload
+            ]
             
             result = subprocess.run(
                 cmd,
@@ -135,14 +127,26 @@ Sent by PR Agentic Workflow
             return False
             
         try:
+            email_from = self.config.email_from
+            if email_from is None:
+                logger.error("Email 'from' address is not configured")
+                return False
+
             msg = MIMEMultipart()
-            msg['From'] = self.config.email_from
+            msg['From'] = email_from
             msg['To'] = ', '.join(to_emails)
             msg['Subject'] = subject
             msg.attach(MIMEText(message, 'plain'))
             
-            logger.info(f"Connecting to SMTP server: {self.config.smtp_server}:{self.config.smtp_port}")
-            with smtplib.SMTP(self.config.smtp_server, self.config.smtp_port) as server:
+            smtp_server = self.config.smtp_server
+            smtp_port = self.config.smtp_port
+            if not smtp_server or not smtp_port:
+                logger.error("SMTP server or port is not configured")
+                return False
+
+
+            logger.info(f"Connecting to SMTP server: {smtp_server}:{smtp_port}")
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls()
 
                 if self.config.smtp_username and self.config.smtp_password:
