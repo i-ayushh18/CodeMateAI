@@ -1,7 +1,10 @@
 import json
 import re
 from typing import List, Dict, Any, Optional
-from crewai.tools import BaseTool
+try:
+    from crewai.tools import BaseTool
+except ImportError:
+    from crewai_tools import BaseTool
 from pydantic import Field
 from integrations.github_integration import GitHubIntegration
 
@@ -92,7 +95,10 @@ class GithubIssueReaderTool(BaseTool):
             except ValueError:
                 return {"error": f"Invalid issue number: {issue_number}"}
     
-        return self.github.get_issue_info_dict(issue_number)
+        result = self.github.get_issue_info_dict(issue_number)
+        if result is None:
+            return {"error": f"Issue #{issue_number} not found"}
+        return result
 
 class GithubFileWriterTool(BaseTool):
     name: str = "github_file_writer"
@@ -140,4 +146,4 @@ class GithubBranchCreatorTool(BaseTool):
     github: GitHubIntegration = Field(..., exclude=True)
 
     def _run(self, repo: str, branch: str, source_branch: str = "main") -> bool:
-        return self.github.create_branch(branch, source_branch)
+        return self.github.create_branch(repo, branch, source_branch)
